@@ -273,7 +273,8 @@ class MQTTSNGatewayServer:
                     LOG.info(f"Connected to MQTT broker")
                     should_stop = False
                     while not should_stop:
-
+                        # TODO: check for errors in the static tasks to see if they
+                        #  need to be restarted.
                         if self.message_tasks:
                             finished_tasks, pending_tasks = await asyncio.wait(
                                 self.message_tasks, timeout=0.5
@@ -337,7 +338,7 @@ class MQTTSNGatewayServer:
             msg = messages.MessageFactory.from_bytes(data)
             if not msg:
                 LOG.info(f"Could not parse {data} as an MQTT-SN message. Dropping")
-                return
+                continue
 
             if isinstance(msg, messages.Connect):
                 self.message_tasks.add(

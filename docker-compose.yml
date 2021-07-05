@@ -9,9 +9,9 @@ services:
       - 5673:5672
 
   mqttsngateway:
-    build: .
+    #build: .
+    image: quay.io/u9n/mqtt-sn-gateway:latest
     ports:
-
     - 2883:2883/udp
 
     environment:

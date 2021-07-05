@@ -285,33 +285,36 @@ class Disconnect:
 @attr.s(auto_attribs=True)
 class MessageFactory:
     @staticmethod
-    def from_bytes(soure_bytes: bytes) -> MqttSnMessage:
-        data = bytearray(soure_bytes)
-        initial_length = data.pop(0)
-        if initial_length == 1:
-            # Indicates that 3 bytes are used for the length.
-            # Next 2 bytes indicates the lenght.
-            length = int.from_bytes(data[:2], "big")
-            data = data[2:]
-        else:
-            length = initial_length
+    def from_bytes(source_bytes: bytes) -> Optional[MqttSnMessage]:
+        try:
+            data = bytearray(source_bytes)
+            initial_length = data.pop(0)
+            if initial_length == 1:
+                # Indicates that 3 bytes are used for the length.
+                # Next 2 bytes indicates the lenght.
+                length = int.from_bytes(data[:2], "big")
+                data = data[2:]
+            else:
+                length = initial_length
 
-        message_type = MessageType(data.pop(0))
+            message_type = MessageType(data.pop(0))
 
-        if message_type == MessageType.CONNECT:
-            return Connect.from_bytes(soure_bytes)
-        elif message_type == MessageType.CONNACK:
-            return Connack.from_bytes(soure_bytes)
-        elif message_type == MessageType.PUBLISH:
-            return Publish.from_bytes(soure_bytes)
-        elif message_type == MessageType.PUBACK:
-            return Puback.from_bytes(soure_bytes)
-        elif message_type == MessageType.REGISTER:
-            return Register.from_bytes(soure_bytes)
-        elif message_type == MessageType.REGACK:
-            return Regack.from_bytes(soure_bytes)
-        else:
-            raise ValueError(f"{message_type} is not supported")
+            if message_type == MessageType.CONNECT:
+                return Connect.from_bytes(source_bytes)
+            elif message_type == MessageType.CONNACK:
+                return Connack.from_bytes(source_bytes)
+            elif message_type == MessageType.PUBLISH:
+                return Publish.from_bytes(source_bytes)
+            elif message_type == MessageType.PUBACK:
+                return Puback.from_bytes(source_bytes)
+            elif message_type == MessageType.REGISTER:
+                return Register.from_bytes(source_bytes)
+            elif message_type == MessageType.REGACK:
+                return Regack.from_bytes(source_bytes)
+            else:
+                raise ValueError(f"{message_type} is not supported")
+        except ValueError:
+            return None
 
 
 # TODO: What is dup?

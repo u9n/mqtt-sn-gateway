@@ -1,8 +1,8 @@
 import socket
 
-HOST, PORT = "localhost", 2883
+HOST, PORT = "localhost", 9999
 
-msg = b'\x0f\x04\x00\x00dtestclient'
+msg = b'\x0b\x09\x00'
 
 
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

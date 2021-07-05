@@ -14,6 +14,11 @@ def format_env_path(env_file_path: str):
 class Config:
     HOST: str
     PORT: int
+    BROKER_HOST: str
+    BROKER_PORT: int
+    BROKER_CONNECTIONS: int
+    BACK_PRESSURE_LIMIT: int
+
 
 
     def __init__(
@@ -28,6 +33,10 @@ class Config:
 
         self.HOST = env.str("HOST")
         self.PORT = env.int("PORT")
+        self.BROKER_HOST = env.str("BROKER_HOST")
+        self.BROKER_PORT = env.int("BROKER_PORT", default=1883)
+        self.BROKER_CONNECTIONS = env.int("BROKER_CONNECTIONS", default=10)
+        self.BACK_PRESSURE_LIMIT = env.int("BACK_PRESSURE_LIMIT", default=1000)
 
 
 

@@ -1,0 +1,26 @@
+version: "2"
+
+services:
+  rabbit-mqtt:
+    build: ./mqtt_docker
+    ports:
+      - 1883:1883
+      - 15673:15672
+      - 5673:5672
+
+  mqttsngateway:
+    build: .
+    ports:
+
+    - 2883:2883/udp
+
+    environment:
+      - HOST=0.0.0.0
+      - PORT=2883
+      - BROKER_HOST=rabbit-mqtt
+      - BROKER_PORT=1883
+      - BROKER_CONNECTIONS=20
+      - BACK_PRESSURE_LIMIT=10000
+
+    depends_on:
+      - rabbit-mqtt

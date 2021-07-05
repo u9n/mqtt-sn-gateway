@@ -1,6 +1,6 @@
 import socket
 
-HOST, PORT = "localhost", 9999
+HOST, PORT = "localhost", 2883
 
 msg = b'\x0f\x04\x00\x00dtestclient'
 

@@ -2,8 +2,8 @@ import asyncio
 import uvloop
 import logging
 import click
-from config import Config
-import async_server
+from mqtt_sn_gateway.config import Config
+from mqtt_sn_gateway.server import MQTTSNGatewayServer
 
 
 LOG = logging.getLogger(__name__)
@@ -11,7 +11,14 @@ LOG = logging.getLogger(__name__)
 
 async def async_main(config: Config):
 
-    gw = async_server.MQTTSNGatewayServer(host=config.HOST, port=config.PORT)
+    gw = MQTTSNGatewayServer(
+        host=config.HOST,
+        port=config.PORT,
+        broker_host=config.BROKER_HOST,
+        broker_port=config.BROKER_PORT,
+        broker_connections=config.BROKER_CONNECTIONS,
+        back_pressure_limit=config.BACK_PRESSURE_LIMIT,
+    )
     try:
         await gw.run()
 

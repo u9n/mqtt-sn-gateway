@@ -252,6 +252,9 @@ class Publish:
     msg_id: bytes
     data: bytes
 
+    @property
+    def length(self) -> int:
+        return 1 + 1 + 1 + 2 + 2 + len(self.data)
     @classmethod
     def from_bytes(cls, source_bytes: bytes):
         data = bytearray(source_bytes)
@@ -263,17 +266,18 @@ class Publish:
             data = data[2:]
         else:
             length = initial_length
-        if length != len(data):
+        if length != len(source_bytes):
             raise ValueError("lenght is not correct")
 
         message_type = MessageType(data.pop(0))
         if message_type != MessageType.PUBLISH:
             raise ValueError("Not a publish message")
 
-        flags = data.pop(0)
+        flags = Flags.from_bytes(data.pop(0).to_bytes(1, 'big'))
         topic_id = int.from_bytes(data[:2], 'big')
         data = data[2:]
         msg_id = bytes(data[:2])
+        data = data[2:]
         payload = bytes(data)
 
         return cls(flags=Flags(), topic_id=topic_id, msg_id=msg_id, data=payload)

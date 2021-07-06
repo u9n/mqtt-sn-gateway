@@ -10,4 +10,5 @@ class TestPublish:
         assert msg.length == len(data)
         assert msg.msg_type == messages.MessageType.PUBLISH
         assert msg.topic_id == 1
+        assert msg.flags == messages.Flags(dup=True, qos=1)
         assert msg.msg_id == b"\xc7\x92"

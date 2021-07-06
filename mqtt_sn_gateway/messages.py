@@ -3,7 +3,6 @@ from enum import IntEnum
 from typing import *
 
 
-
 PROTOCOL_ID = 0x01  # Always this for MQTT:SB
 
 
@@ -61,7 +60,6 @@ class MqttSnMessage(Protocol):
         ...
 
 
-
 @attr.s(auto_attribs=True)
 class Header:
     """
@@ -87,14 +85,21 @@ class Flags:
     def from_bytes(cls, source_byte: bytes):
         if len(source_byte) != 1:
             raise ValueError(f"Flags are only 1 byte. Got {len(source_byte)}")
-        val = int.from_bytes(source_byte, 'big')
+        val = int.from_bytes(source_byte, "big")
         dup = bool(val & 0b10000000)
         qos = (val & 0b01100000) >> 5
         retain = bool(val & 0b00010000)
         will = bool(val & 0b00001000)
         clean_session = bool(val & 0b00000100)
         topic_type = TopicType(val & 0b00000011)
-        return cls(dup=dup, qos=qos, retain=retain, will=will, clean_session=clean_session, topic_type=topic_type)
+        return cls(
+            dup=dup,
+            qos=qos,
+            retain=retain,
+            will=will,
+            clean_session=clean_session,
+            topic_type=topic_type,
+        )
 
     def to_bytes(self) -> bytes:
         out = 0
@@ -108,7 +113,7 @@ class Flags:
         if self.clean_session:
             out += 0b00000100
         out += self.topic_type.value
-        return out.to_bytes(1, 'big')
+        return out.to_bytes(1, "big")
 
 
 # TODO: Length is including the length bytes!
@@ -143,7 +148,7 @@ class Connect:
         if msg_type is not MessageType.CONNECT:
             raise ValueError()
 
-        flags = Flags.from_bytes(data.pop(0).to_bytes(1, 'big'))
+        flags = Flags.from_bytes(data.pop(0).to_bytes(1, "big"))
         protocol_id = data.pop(0)
         if protocol_id != PROTOCOL_ID:
             raise ValueError("Wrong protocol_id")
@@ -157,6 +162,7 @@ class Connack:
 
     msg_type: ClassVar[MessageType] = MessageType.CONNACK
     return_code: ReturnCode
+
     @property
     def length(self) -> int:
         return 3
@@ -170,7 +176,15 @@ class Connack:
 
     @classmethod
     def from_bytes(cls, source_bytes):
-        return cls
+        data = bytearray(source_bytes)
+        length = data.pop(0)
+        if length != 3:
+            raise ValueError("Incorrect length for a CONNACK")
+        msg_type = MessageType(data.pop(0))
+        if msg_type != MessageType.CONNACK:
+            raise ValueError("Data is not a CONNACK")
+        return_code = ReturnCode(data.pop(0))
+        return cls(return_code=return_code)
 
 
 @attr.s(auto_attribs=True)
@@ -206,7 +220,7 @@ class Register:
         if topic_id == b"\x00\x00":
             topic_id = None
         else:
-            topic_id = int.from_bytes(topic_id, 'big')
+            topic_id = int.from_bytes(topic_id, "big")
         data = data[2:]
 
         msg_id = bytes(data[:2])
@@ -223,6 +237,7 @@ class Regack:
     topic_id: Optional[int]
     msg_id: bytes
     return_code: ReturnCode
+
     @property
     def length(self) -> int:
         return 2 + 2 + 2 + 1
@@ -232,7 +247,7 @@ class Regack:
         out.append(self.length)
         out.append(self.msg_type.value)
         if self.topic_id:
-            out.extend(self.topic_id.to_bytes(2, 'big'))
+            out.extend(self.topic_id.to_bytes(2, "big"))
         else:
             out.extend(b"\x00\x00")
         out.extend(self.msg_id)
@@ -241,7 +256,19 @@ class Regack:
 
     @classmethod
     def from_bytes(cls, source_bytes):
-        return cls
+        data = bytearray(source_bytes)
+        length = data.pop(0)
+        if length != len(source_bytes):
+            raise ValueError("Incorrect length")
+        msg_type = MessageType(data.pop(0))
+        if msg_type != MessageType.REGACK:
+            raise ValueError("Not a REGACK message")
+        topic_id = int.from_bytes(data[:2], "big")
+        data = data[2:]
+        msg_id = bytes(data[:2])
+        data = data[2:]
+        return_code = ReturnCode(data.pop(0))
+        return cls(topic_id=topic_id, msg_id=msg_id, return_code=return_code)
 
 
 @attr.s(auto_attribs=True)
@@ -255,6 +282,7 @@ class Publish:
     @property
     def length(self) -> int:
         return 1 + 1 + 1 + 2 + 2 + len(self.data)
+
     @classmethod
     def from_bytes(cls, source_bytes: bytes):
         data = bytearray(source_bytes)
@@ -273,14 +301,14 @@ class Publish:
         if message_type != MessageType.PUBLISH:
             raise ValueError("Not a publish message")
 
-        flags = Flags.from_bytes(data.pop(0).to_bytes(1, 'big'))
-        topic_id = int.from_bytes(data[:2], 'big')
+        flags = Flags.from_bytes(data.pop(0).to_bytes(1, "big"))
+        topic_id = int.from_bytes(data[:2], "big")
         data = data[2:]
         msg_id = bytes(data[:2])
         data = data[2:]
         payload = bytes(data)
 
-        return cls(flags=Flags(), topic_id=topic_id, msg_id=msg_id, data=payload)
+        return cls(flags=flags, topic_id=topic_id, msg_id=msg_id, data=payload)
 
 
 @attr.s(auto_attribs=True)
@@ -289,7 +317,7 @@ class Puback:
     topic_id: int
     msg_id: bytes
     return_code: ReturnCode
-    
+
     @property
     def length(self) -> int:
         return 2 + 2 + 2 + 1
@@ -298,14 +326,26 @@ class Puback:
         out = bytearray()
         out.append(self.length)
         out.append(self.msg_type)
-        out.extend(self.topic_id.to_bytes(2, 'big'))
+        out.extend(self.topic_id.to_bytes(2, "big"))
         out.extend(self.msg_id)
         out.append(self.return_code)
         return bytes(out)
 
     @classmethod
     def from_bytes(cls, source_bytes):
-        return cls
+        data = bytearray(source_bytes)
+        length = data.pop(0)
+        if length != len(source_bytes):
+            raise ValueError("Incorrect length")
+        msg_type = MessageType(data.pop(0))
+        if msg_type != MessageType.PUBACK:
+            raise ValueError("Not a PUBACK message")
+        topic_id = int.from_bytes(data[:2], "big")
+        data = data[2:]
+        msg_id = bytes(data[:2])
+        data = data[2:]
+        return_code = ReturnCode(data.pop(0))
+        return cls(topic_id=topic_id, msg_id=msg_id, return_code=return_code)
 
 
 @attr.s(auto_attribs=True)

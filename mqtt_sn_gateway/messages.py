@@ -197,7 +197,7 @@ class Register:
             data = data[2:]
         else:
             length = initial_length
-        if length != len(data):
+        if length != len(source_bytes):
             raise ValueError("lenght is not correct")
 
         message_type = MessageType(data.pop(0))

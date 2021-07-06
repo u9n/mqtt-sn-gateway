@@ -83,6 +83,36 @@ class Flags:
     clean_session: bool = attr.ib(default=False)
     topic_type: TopicType = attr.ib(default=TopicType.NORMAL)
 
+    @classmethod
+    def from_bytes(cls, source_byte: bytes):
+        if len(source_byte) != 1:
+            raise ValueError(f"Flags are only 1 byte. Got {len(source_byte)}")
+        val = int.from_bytes(source_byte, 'big')
+        dup = bool(val & 0b10000000)
+        qos = (val & 0b01100000) >> 5
+        retain = bool(val & 0b00010000)
+        will = bool(val & 0b00001000)
+        clean_session = bool(val & 0b00000100)
+        topic_type = TopicType(val & 0b00000011)
+        return cls(dup=dup, qos=qos, retain=retain, will=will, clean_session=clean_session, topic_type=topic_type)
+
+    def to_bytes(self) -> bytes:
+        out = 0
+        if self.dup:
+            out += 0b10000000
+        out += self.qos << 5
+        if self.retain:
+            out += 0b00010000
+        if self.will:
+            out += 0b00001000
+        if self.clean_session:
+            out += 0b00000100
+        out += self.topic_type.value
+        return out.to_bytes(1, 'big')
+
+
+# TODO: Length is including the length bytes!
+
 
 @attr.s(auto_attribs=True)
 class Connect:
@@ -93,7 +123,7 @@ class Connect:
 
     @property
     def length(self) -> int:
-        return 5 + len(self.client_id)
+        return 6 + len(self.client_id)
 
     def to_bytes(self):
         out = bytearray()
@@ -110,13 +140,16 @@ class Connect:
         length = data.pop(0)
         # TODO: Check if length is 3 bytes
         msg_type = MessageType(data.pop(0))
-        # print(msg_type)
         if msg_type is not MessageType.CONNECT:
             raise ValueError()
-        flags = data.pop(0)
+
+        flags = Flags.from_bytes(data.pop(0).to_bytes(1, 'big'))
+        protocol_id = data.pop(0)
+        if protocol_id != PROTOCOL_ID:
+            raise ValueError("Wrong protocol_id")
         duration = int.from_bytes(data[:2], "big")
         client_id = bytes(data[2:])
-        return cls(flags=Flags(), duration=duration, client_id=client_id)
+        return cls(flags=flags, duration=duration, client_id=client_id)
 
 
 @attr.s(auto_attribs=True)
@@ -126,7 +159,7 @@ class Connack:
     return_code: ReturnCode
     @property
     def length(self) -> int:
-        return 2
+        return 3
 
     def to_bytes(self) -> bytes:
         out = bytearray()
@@ -151,7 +184,7 @@ class Register:
     @property
     def length(self) -> int:
         # TODO: handle large payload length
-        return 1 + 2 + 2 + len(self.topic_name)
+        return 2 + 2 + 2 + len(self.topic_name)
 
     @classmethod
     def from_bytes(cls, source_bytes: bytes):
@@ -192,7 +225,7 @@ class Regack:
     return_code: ReturnCode
     @property
     def length(self) -> int:
-        return 1 + 2 + 2 + 1
+        return 2 + 2 + 2 + 1
 
     def to_bytes(self):
         out = bytearray()
@@ -255,7 +288,7 @@ class Puback:
     
     @property
     def length(self) -> int:
-        return 1 + 2 + 2 + 1
+        return 2 + 2 + 2 + 1
 
     def to_bytes(self):
         out = bytearray()

@@ -9,7 +9,7 @@ DESCRIPTION = "An async Python MQTT-SN Gayeway"
 URL = "https://github.com/u9n/mqtt-sn-gateway"
 EMAIL = "henrik@pwit.se"
 AUTHOR = "Henrik Palmlund Wahlgren @ Palmlund Wahlgren Innovative Technology AB"
-REQUIRES_PYTHON = ">=3.6"
+REQUIRES_PYTHON = ">=3.7"
 VERSION = "21.0.0"
 
 # What packages are required for this module to be executed?
@@ -92,7 +92,6 @@ setup(
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3 :: Only",
-        "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",

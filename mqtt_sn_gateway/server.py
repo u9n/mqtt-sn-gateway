@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import AsyncExitStack
+from datetime import datetime, timedelta, timezone
+from typing import *
+
 import asyncio_dgram
+import attr
+import structlog
 from asyncio_dgram.aio import DatagramStream
 from asyncio_mqtt import Client as MqttClient
 from asyncio_mqtt import MqttError
-import logging
+
 from mqtt_sn_gateway import messages, topics
-from contextlib import AsyncExitStack
 
-LOG = logging.getLogger(__name__)
-import attr
-from typing import *
-from datetime import datetime, timedelta, timezone
-
-# TODO: we should limit the amount of inflight publishes. So that the server is not atacked out of memory
+LOG = structlog.get_logger()
 
 
 @attr.s(auto_attribs=True)
@@ -124,13 +124,13 @@ class MQTTSNGatewayServer:
             ),
             remote_addr=remote_addr,
         )
-        LOG.info(f"Received {msg} from {new_client}")
+        LOG.info(f"Received CONNECT", message=msg, client=new_client)
 
         self.client_store.add_client(new_client)
         # TODO: check for last will and testament.
         # If all is ok we send a CONACK message
         connack = messages.Connack(return_code=messages.ReturnCode.ACCEPTED)
-        LOG.info(f"Sending {connack} to {new_client}")
+        LOG.info(f"Sending CONNACK",  messages=connack, client=new_client)
         await self.write_queue.put(
             WriteEvent(
                 data=connack.to_bytes(),
@@ -143,17 +143,18 @@ class MQTTSNGatewayServer:
     ):
         client = self.client_store.get_client(remote_addr)
         if client:
-            LOG.info(f"Received {msg} from {client}")
+            LOG.info(f"Received REGISTER", message=msg, client=client)
             topic_id = self.topic_store.add_topic_for_client(
                 topic_name=msg.topic_name, client_id=client.client_id
             )
+            LOG.info(f"Topic registered", client=client, topic_id=topic_id, topic_name=msg.topic_name)
+
             regack = messages.Regack(
                 topic_id=topic_id,
                 msg_id=msg.msg_id,
                 return_code=messages.ReturnCode.ACCEPTED,
             )
-            LOG.info(f"Topic {topic_id}:{msg.topic_name} registered for {client}. ")
-            LOG.info(f"Sending {regack} to {client}")
+            LOG.info(f"Sending REGACK", message=regack, client=client)
             await self.write_queue.put(
                 WriteEvent(regack.to_bytes(), client.remote_addr)
             )
@@ -161,19 +162,19 @@ class MQTTSNGatewayServer:
         else:
             # assuming of the client has not registered we are not supporting the client
             # and a NOT_SUPPORTED should be sent.
-            LOG.info(f"Received {msg} from unknown client at {remote_addr}")
+            LOG.info(f"Received REGISTER from unknown client", message=msg, client=remote_addr)
             regack = messages.Regack(
                 topic_id=None,
                 msg_id=msg.msg_id,
                 return_code=messages.ReturnCode.NOT_SUPPORTED,
             )
-            LOG.info(f"Sending {regack} to unknown client at {remote_addr}")
+            LOG.info(f"Sending REGACK", message=regack, client=remote_addr)
             await self.write_queue.put(WriteEvent(regack.to_bytes(), remote_addr))
 
     async def handle_publish(self, msg: messages.Publish, remote_addr: Tuple[str, int]):
         client = self.client_store.get_client(remote_addr)
         if client:
-            LOG.info(f"Received {msg} from {client}")
+            LOG.info(f"Received PUBLISH", message=msg, client=client)
             topic = self.topic_store.get_topic_for_client(
                 client.client_id, topic_id=msg.topic_id
             )
@@ -182,13 +183,13 @@ class MQTTSNGatewayServer:
                     mqtt = self.mqtt_client
                     if mqtt:
                         await mqtt.publish(topic=topic, payload=msg.data, qos=1)
-                        LOG.info(f"Published {msg.data!r} to MQTT with topic {topic}")
+                        LOG.info(f"Forwarded to MQTT", data=msg.data, topic=topic)
                         puback = messages.Puback(
                             topic_id=msg.topic_id,
                             msg_id=msg.msg_id,
                             return_code=messages.ReturnCode.ACCEPTED,
                         )
-                        LOG.info(f"Sending {puback} for {client}")
+                        LOG.info(f"Sending PUBACK", message=puback, client=client)
                         await self.write_queue.put(
                             WriteEvent(puback.to_bytes(), remote_addr)
                         )
@@ -200,8 +201,7 @@ class MQTTSNGatewayServer:
                             return_code=messages.ReturnCode.CONGESTION,
                         )
                         LOG.info(
-                            f"Sending {puback} due to no available MQTT connections for {client}"
-                        )
+                            f"Congestion. Sending PUBACK.", message=puback, client=client)
                         await self.write_queue.put(
                             WriteEvent(puback.to_bytes(), remote_addr)
                         )
@@ -212,7 +212,7 @@ class MQTTSNGatewayServer:
                         msg_id=msg.msg_id,
                         return_code=messages.ReturnCode.CONGESTION,
                     )
-                    LOG.info(f"Sending {puback} due to MQTT error for {client}")
+                    LOG.info(f"MQTT Error. Sending PUBACK", messages=puback, client=client)
                     await self.write_queue.put(
                         WriteEvent(puback.to_bytes(), remote_addr)
                     )
@@ -221,31 +221,31 @@ class MQTTSNGatewayServer:
 
             else:
                 LOG.info(
-                    f"Could not find a registered topic for {msg.topic_id} on {client}"
+                    f"Topic not found", topic_id=msg.topic_id, client=client
                 )
                 puback = messages.Puback(
                     topic_id=msg.topic_id,
                     msg_id=msg.msg_id,
                     return_code=messages.ReturnCode.INVALID_TOPIC,
                 )
-                LOG.info(f"Sending {puback} for {client}")
-                await self.write_queue.put(WriteEvent(puback.to_bytes(), remote_addr))
+                LOG.info(f"Sending PUBACK.", message=puback, client=client)
+                await self.write_queue.put(WriteEvent(puback.to_bytes(), client.remote_addr))
         else:
-            LOG.info(f"Received {msg} from unknown client at {remote_addr}")
+            LOG.info(f"Received PUBLISH from unknown client", message=msg, client=remote_addr)
             puback = messages.Puback(
                 topic_id=msg.topic_id,
                 msg_id=msg.msg_id,
                 return_code=messages.ReturnCode.NOT_SUPPORTED,
             )
-            LOG.info(f"Sending {puback} to unknown client at {remote_addr}")
+            LOG.info(f"Sending PUBACK", message=puback, client=remote_addr)
             await self.write_queue.put(WriteEvent(puback.to_bytes(), remote_addr))
 
     async def run(self):
-        LOG.info("Starting MQTT-SN Gateway")
-        LOG.info(f"Binding UDP socket to ({self.host}:{self.port})")
+        LOG.info("Starting MQTT-SN Gateway", host=self.host, port=self.port)
         udp_stream = await asyncio_dgram.bind((self.host, self.port))
+        LOG.info(f"Starting reader task")
         self.reader_task = asyncio.create_task(self.datagram_reader(udp_stream))
-        LOG.info(f"Listening on incoming UDP-packets on ({self.host}:{self.port})")
+        LOG.info(f"Starting writer task")
         self.writer_task = asyncio.create_task(
             self.datagram_writer(udp_stream, self.write_queue)
         )
@@ -258,8 +258,7 @@ class MQTTSNGatewayServer:
                 async with AsyncExitStack() as stack:
                     stack.push_async_callback(cancel_tasks, self.message_tasks)
                     LOG.info(
-                        f"Setting up {self.broker_connections} connections to MQTT "
-                        f"broker at {self.broker_host}:{self.broker_port} "
+                        f"Setting up MQTT connections", broker_host=self.broker_host, broker_port=self.broker_port, amount=self.broker_connections
                     )
 
                     clients = [
@@ -270,7 +269,7 @@ class MQTTSNGatewayServer:
                     ]
                     self.broker_clients = clients
 
-                    LOG.info(f"Connected to MQTT broker")
+                    LOG.info(f"Connected to MQTT broker", host=self.broker_host, port=self.broker_port)
                     should_stop = False
                     while not should_stop:
                         # TODO: check for errors in the static tasks to see if they
@@ -287,7 +286,7 @@ class MQTTSNGatewayServer:
                                     task.result()
 
                                 except MqttError as mqtt_error:
-                                    LOG.error(f"MQTT_ERROR: {mqtt_error}")
+                                    LOG.error(f"MQTT_ERROR", error=mqtt_error)
                                     # Releasing the tasks check loop to initiate
                                     # restart of broker connections.
                                     should_stop = True
@@ -318,7 +317,7 @@ class MQTTSNGatewayServer:
         while True:
             data, remote_addr = await udp_stream.recv()
             LOG.debug(
-                f"Received UDP packet of {len(data)} bytes ({data}) from {remote_addr}"
+                f"Received datagram", length=len(data), data=data, source=remote_addr
             )
             await self.datagram_queue.put((data, remote_addr))
 
@@ -328,7 +327,7 @@ class MQTTSNGatewayServer:
         while True:
             write_event = await queue.get()
             LOG.debug(
-                f"Sending {len(write_event.data)} bytes ({write_event.data}) to {write_event.remote_addr}"
+                f"Sending datagram", length=len(write_event.data), data=write_event.data, destination=write_event.remote_addr
             )
             await udp_stream.send(write_event.data, write_event.remote_addr)
 
@@ -337,7 +336,7 @@ class MQTTSNGatewayServer:
             data, remote_addr = await self.datagram_queue.get()
             msg = messages.MessageFactory.from_bytes(data)
             if not msg:
-                LOG.info(f"Could not parse {data} as an MQTT-SN message. Dropping")
+                LOG.info(f"Could not parse MQTT-SN message. Dropping", data=data)
                 continue
 
             if isinstance(msg, messages.Connect):
@@ -356,4 +355,4 @@ class MQTTSNGatewayServer:
                 )
 
             else:
-                LOG.error(f"Gateway cannot handle {msg}")
+                LOG.error(f"Gateway cannot handle message", message=msg)

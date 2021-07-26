@@ -1,12 +1,13 @@
 import asyncio
 import uvloop
+import structlog
 import logging
 import click
 from mqtt_sn_gateway.config import Config
 from mqtt_sn_gateway.server import MQTTSNGatewayServer
 
 
-LOG = logging.getLogger(__name__)
+LOG = structlog.get_logger()
 
 
 async def async_main(config: Config):

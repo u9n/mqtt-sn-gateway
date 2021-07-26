@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Optional
 
-import environ
+import environ  # type: ignore
 
 
 def format_env_path(env_file_path: str):
@@ -28,7 +28,7 @@ class Config:
         env = environ.Env()
 
         if not no_env_files:
-            file_path: str = env_file_path or Path.joinpath(root_dir, ".env")
+            file_path = env_file_path or Path.joinpath(root_dir, ".env")
             env.read_env(env_file=str(file_path))
 
         self.HOST = env.str("HOST")

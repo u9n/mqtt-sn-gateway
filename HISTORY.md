@@ -13,11 +13,15 @@ and this project adheres to [Calendar Versioning](https://calver.org/)
 
 ### Changed
 
+* Made client and topic store Protocols use async methods.
+
 ### Deprecated
 
 ### Removed
 
 ### Fixed
+
+* If a client is not found in the client store the gateway responds with a DISCONNECT.
 
 ### Security
 

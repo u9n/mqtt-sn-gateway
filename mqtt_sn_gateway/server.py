@@ -5,14 +5,15 @@ from contextlib import AsyncExitStack
 from datetime import datetime, timedelta, timezone
 from typing import *
 
-import asyncio_dgram
+import asyncio_dgram  # type: ignore
 import attr
 import structlog
-from asyncio_dgram.aio import DatagramStream
+from asyncio_dgram.aio import DatagramStream  # type: ignore
 from asyncio_mqtt import Client as MqttClient
 from asyncio_mqtt import MqttError
 
 from mqtt_sn_gateway import messages, topics
+from mqtt_sn_gateway.messages import Disconnect
 
 LOG = structlog.get_logger()
 
@@ -31,13 +32,13 @@ class WriteEvent:
 
 
 class ClientStore(Protocol):
-    def add_client(self, client: MqttSnClient) -> None:
+    async def add_client(self, client: MqttSnClient) -> None:
         ...
 
-    def get_client(self, remote_addr: Tuple[str, int]) -> Optional[MqttSnClient]:
+    async def get_client(self, remote_addr: Tuple[str, int]) -> Optional[MqttSnClient]:
         ...
 
-    def delete_client(self, remote_addr: Tuple[str, int]) -> None:
+    async def delete_client(self, remote_addr: Tuple[str, int]) -> None:
         ...
 
 
@@ -50,13 +51,13 @@ class InMemoryClientStore:
     def key_from_remote_addr(remote_addr: Tuple[str, int]) -> str:
         return f"{remote_addr[0]}:{remote_addr[1]}"
 
-    def add_client(self, client: MqttSnClient):
+    async def add_client(self, client: MqttSnClient):
         self.clients[self.key_from_remote_addr(client.remote_addr)] = client
 
-    def get_client(self, remote_addr: Tuple[str, int]):
+    async def get_client(self, remote_addr: Tuple[str, int]):
         return self.clients.get(self.key_from_remote_addr(remote_addr), None)
 
-    def delete_client(self, remote_addr: Tuple[str, int]):
+    async def delete_client(self, remote_addr: Tuple[str, int]):
         del self.clients[self.key_from_remote_addr(remote_addr)]
 
 
@@ -124,121 +125,101 @@ class MQTTSNGatewayServer:
             ),
             remote_addr=remote_addr,
         )
-        LOG.info(f"Received CONNECT", message=msg, client=new_client)
-
-        self.client_store.add_client(new_client)
+        await self.client_store.add_client(new_client)
+        LOG.info("Added client", client=new_client)
         # TODO: check for last will and testament.
         # If all is ok we send a CONACK message
-        connack = messages.Connack(return_code=messages.ReturnCode.ACCEPTED)
-        LOG.info(f"Sending CONNACK",  messages=connack, client=new_client)
+        response = messages.Connack(return_code=messages.ReturnCode.ACCEPTED)
+        LOG.info(f"Sending CONNACK", messages=response, client=new_client)
         await self.write_queue.put(
             WriteEvent(
-                data=connack.to_bytes(),
+                data=response.to_bytes(),
                 remote_addr=new_client.remote_addr,
             ),
         )
 
-    async def handle_register(
-        self, msg: messages.Register, remote_addr: Tuple[str, int]
-    ):
-        client = self.client_store.get_client(remote_addr)
-        if client:
-            LOG.info(f"Received REGISTER", message=msg, client=client)
-            topic_id = self.topic_store.add_topic_for_client(
-                topic_name=msg.topic_name, client_id=client.client_id
-            )
-            LOG.info(f"Topic registered", client=client, topic_id=topic_id, topic_name=msg.topic_name)
+    async def handle_register(self, msg: messages.Register, client: MqttSnClient):
+        topic_id = await self.topic_store.add_topic_for_client(
+            topic_name=msg.topic_name, client_id=client.client_id
+        )
+        LOG.info(
+            f"Registered topic",
+            topic_id=topic_id,
+            topic_name=msg.topic_name,
+            client=client,
+        )
 
-            regack = messages.Regack(
-                topic_id=topic_id,
-                msg_id=msg.msg_id,
-                return_code=messages.ReturnCode.ACCEPTED,
-            )
-            LOG.info(f"Sending REGACK", message=regack, client=client)
-            await self.write_queue.put(
-                WriteEvent(regack.to_bytes(), client.remote_addr)
-            )
+        regack = messages.Regack(
+            topic_id=topic_id,
+            msg_id=msg.msg_id,
+            return_code=messages.ReturnCode.ACCEPTED,
+        )
+        LOG.info(f"Sending REGACK", message=regack, client=client)
+        await self.write_queue.put(WriteEvent(regack.to_bytes(), client.remote_addr))
 
-        else:
-            # assuming of the client has not registered we are not supporting the client
-            # and a NOT_SUPPORTED should be sent.
-            LOG.info(f"Received REGISTER from unknown client", message=msg, client=remote_addr)
-            regack = messages.Regack(
-                topic_id=None,
-                msg_id=msg.msg_id,
-                return_code=messages.ReturnCode.NOT_SUPPORTED,
-            )
-            LOG.info(f"Sending REGACK", message=regack, client=remote_addr)
-            await self.write_queue.put(WriteEvent(regack.to_bytes(), remote_addr))
-
-    async def handle_publish(self, msg: messages.Publish, remote_addr: Tuple[str, int]):
-        client = self.client_store.get_client(remote_addr)
-        if client:
-            LOG.info(f"Received PUBLISH", message=msg, client=client)
-            topic = self.topic_store.get_topic_for_client(
-                client.client_id, topic_id=msg.topic_id
-            )
-            if topic:
-                try:
-                    mqtt = self.mqtt_client
-                    if mqtt:
-                        await mqtt.publish(topic=topic, payload=msg.data, qos=1)
-                        LOG.info(f"Forwarded to MQTT", data=msg.data, topic=topic)
-                        puback = messages.Puback(
-                            topic_id=msg.topic_id,
-                            msg_id=msg.msg_id,
-                            return_code=messages.ReturnCode.ACCEPTED,
-                        )
-                        LOG.info(f"Sending PUBACK", message=puback, client=client)
-                        await self.write_queue.put(
-                            WriteEvent(puback.to_bytes(), remote_addr)
-                        )
-                    else:
-                        # No MQTT connections available
-                        puback = messages.Puback(
-                            topic_id=msg.topic_id,
-                            msg_id=msg.msg_id,
-                            return_code=messages.ReturnCode.CONGESTION,
-                        )
-                        LOG.info(
-                            f"Congestion. Sending PUBACK.", message=puback, client=client)
-                        await self.write_queue.put(
-                            WriteEvent(puback.to_bytes(), remote_addr)
-                        )
-                except MqttError as e:
-                    LOG.error(e)
+    async def handle_publish(self, msg: messages.Publish, client: MqttSnClient):
+        topic = await self.topic_store.get_topic_for_client(
+            client.client_id, topic_id=msg.topic_id
+        )
+        if topic:
+            try:
+                mqtt = self.mqtt_client
+                if mqtt:
+                    await mqtt.publish(topic=topic, payload=msg.data, qos=1)
+                    LOG.info(
+                        f"Forwarded to MQTT", data=msg.data, topic=topic, client=client
+                    )
+                    puback = messages.Puback(
+                        topic_id=msg.topic_id,
+                        msg_id=msg.msg_id,
+                        return_code=messages.ReturnCode.ACCEPTED,
+                    )
+                    LOG.info(f"Sending PUBACK", message=puback, client=client)
+                    await self.write_queue.put(
+                        WriteEvent(puback.to_bytes(), client.remote_addr)
+                    )
+                else:
+                    # No MQTT connections available
                     puback = messages.Puback(
                         topic_id=msg.topic_id,
                         msg_id=msg.msg_id,
                         return_code=messages.ReturnCode.CONGESTION,
                     )
-                    LOG.info(f"MQTT Error. Sending PUBACK", messages=puback, client=client)
-                    await self.write_queue.put(
-                        WriteEvent(puback.to_bytes(), remote_addr)
+                    LOG.info(
+                        f"Congestion. Sending PUBACK.", message=puback, client=client
                     )
-
-                    raise
-
-            else:
-                LOG.info(
-                    f"Topic not found", topic_id=msg.topic_id, client=client
-                )
+                    await self.write_queue.put(
+                        WriteEvent(puback.to_bytes(), client.remote_addr)
+                    )
+            except MqttError as e:
+                LOG.error(e)
                 puback = messages.Puback(
                     topic_id=msg.topic_id,
                     msg_id=msg.msg_id,
-                    return_code=messages.ReturnCode.INVALID_TOPIC,
+                    return_code=messages.ReturnCode.CONGESTION,
                 )
-                LOG.info(f"Sending PUBACK.", message=puback, client=client)
-                await self.write_queue.put(WriteEvent(puback.to_bytes(), client.remote_addr))
+                LOG.info(f"MQTT Error. Sending PUBACK", messages=puback, client=client)
+                await self.write_queue.put(
+                    WriteEvent(puback.to_bytes(), client.remote_addr)
+                )
+
+                raise
+
         else:
-            LOG.info(f"Received PUBLISH from unknown client", message=msg, client=remote_addr)
+            LOG.info(f"Topic not found", topic_id=msg.topic_id, client=client)
             puback = messages.Puback(
                 topic_id=msg.topic_id,
                 msg_id=msg.msg_id,
-                return_code=messages.ReturnCode.NOT_SUPPORTED,
+                return_code=messages.ReturnCode.INVALID_TOPIC,
             )
-            LOG.info(f"Sending PUBACK", message=puback, client=remote_addr)
-            await self.write_queue.put(WriteEvent(puback.to_bytes(), remote_addr))
+            LOG.info(f"Sending PUBACK.", message=puback, client=client)
+            await self.write_queue.put(
+                WriteEvent(puback.to_bytes(), client.remote_addr)
+            )
+
+    async def send_disconnect(self, remote_addr: Tuple[str, int]):
+        LOG.info("Sending DISCONNECT", client=remote_addr)
+        await self.write_queue.put(WriteEvent(Disconnect().to_bytes(), remote_addr))
 
     async def run(self):
         LOG.info("Starting MQTT-SN Gateway", host=self.host, port=self.port)
@@ -258,7 +239,10 @@ class MQTTSNGatewayServer:
                 async with AsyncExitStack() as stack:
                     stack.push_async_callback(cancel_tasks, self.message_tasks)
                     LOG.info(
-                        f"Setting up MQTT connections", broker_host=self.broker_host, broker_port=self.broker_port, amount=self.broker_connections
+                        f"Setting up MQTT connections",
+                        broker_host=self.broker_host,
+                        broker_port=self.broker_port,
+                        amount=self.broker_connections,
                     )
 
                     clients = [
@@ -269,7 +253,11 @@ class MQTTSNGatewayServer:
                     ]
                     self.broker_clients = clients
 
-                    LOG.info(f"Connected to MQTT broker", host=self.broker_host, port=self.broker_port)
+                    LOG.info(
+                        f"Connected to MQTT broker",
+                        host=self.broker_host,
+                        port=self.broker_port,
+                    )
                     should_stop = False
                     while not should_stop:
                         # TODO: check for errors in the static tasks to see if they
@@ -327,7 +315,10 @@ class MQTTSNGatewayServer:
         while True:
             write_event = await queue.get()
             LOG.debug(
-                f"Sending datagram", length=len(write_event.data), data=write_event.data, destination=write_event.remote_addr
+                f"Sending datagram",
+                length=len(write_event.data),
+                data=write_event.data,
+                destination=write_event.remote_addr,
             )
             await udp_stream.send(write_event.data, write_event.remote_addr)
 
@@ -338,6 +329,11 @@ class MQTTSNGatewayServer:
             if not msg:
                 LOG.info(f"Could not parse MQTT-SN message. Dropping", data=data)
                 continue
+            LOG.info(
+                f"Received {(msg.__class__.__name__).upper()}",
+                message=msg,
+                source=remote_addr,
+            )
 
             if isinstance(msg, messages.Connect):
                 self.message_tasks.add(
@@ -345,14 +341,26 @@ class MQTTSNGatewayServer:
                 )
 
             elif isinstance(msg, messages.Register):
-                self.message_tasks.add(
-                    asyncio.create_task(self.handle_register(msg, remote_addr))
-                )
+                client = await self.client_store.get_client(remote_addr)
+                if client:
+                    self.message_tasks.add(
+                        asyncio.create_task(self.handle_register(msg, client))
+                    )
+                else:
+                    # if no client in client store return DISCONNECT.
+                    LOG.error("Unknown client", client=remote_addr)
+                    await self.send_disconnect(remote_addr)
 
             elif isinstance(msg, messages.Publish):
-                self.message_tasks.add(
-                    asyncio.create_task(self.handle_publish(msg, remote_addr))
-                )
+                client = await self.client_store.get_client(remote_addr)
+                if client:
+                    self.message_tasks.add(
+                        asyncio.create_task(self.handle_publish(msg, client))
+                    )
+                else:
+                    # if no client in client store return DISCONNECT.
+                    LOG.error("Unknown client", client=remote_addr)
+                    await self.send_disconnect(remote_addr)
 
             else:
                 LOG.error(f"Gateway cannot handle message", message=msg)

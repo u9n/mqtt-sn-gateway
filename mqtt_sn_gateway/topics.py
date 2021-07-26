@@ -3,10 +3,10 @@ from typing import *
 
 
 class TopicStore(Protocol):
-    def add_topic_for_client(self, client_id: bytes, topic_name: str) -> int:
+    async def add_topic_for_client(self, client_id: bytes, topic_name: str) -> int:
         ...
 
-    def get_topic_for_client(self, client_id: bytes, topic_id: int) -> Optional[str]:
+    async def get_topic_for_client(self, client_id: bytes, topic_id: int) -> Optional[str]:
         ...
 
 
@@ -17,7 +17,7 @@ class InMemoryTopicStore:
     topic_names: Dict[bytes, Dict[str, int]] = attr.ib(factory=dict)
     last_topic_ids: Dict[bytes, int] = attr.ib(factory=dict)
 
-    def add_topic_for_client(self, client_id: bytes, topic_name: str) -> int:
+    async def add_topic_for_client(self, client_id: bytes, topic_name: str) -> int:
         # is there a client?
         client_topics = self.topic_names.get(client_id, None)
         if client_topics is None:
@@ -37,7 +37,7 @@ class InMemoryTopicStore:
         self.topics_ids[client_id][topic_id] = topic_name
         return topic_id
 
-    def get_topic_for_client(
+    async def get_topic_for_client(
         self, client_id: bytes, topic_id: int
     ) -> Optional[str]:
         client_topic_ids = self.topics_ids.get(client_id, None)

@@ -161,11 +161,23 @@ class MQTTSNGatewayServer:
         topic = await self.topic_store.get_topic_for_client(
             client.client_id, topic_id=msg.topic_id
         )
+        if msg.flags.qos not in [0, 1]:
+            puback = messages.Puback(
+                topic_id=msg.topic_id,
+                msg_id=msg.msg_id,
+                return_code=messages.ReturnCode.NOT_SUPPORTED,
+            )
+            LOG.info(f"Unsupported QoS. Sending PUBACK", messages=puback, client=client)
+            await self.write_queue.put(
+                WriteEvent(puback.to_bytes(), client.remote_addr)
+            )
+            return
+
         if topic:
             try:
                 mqtt = self.mqtt_client
                 if mqtt:
-                    await mqtt.publish(topic=topic, payload=msg.data, qos=1)
+                    await mqtt.publish(topic=topic, payload=msg.data, qos=msg.flags.qos)
                     LOG.info(
                         f"Forwarded to MQTT", data=msg.data, topic=topic, client=client
                     )

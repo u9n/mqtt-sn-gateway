@@ -11,9 +11,12 @@ and this project adheres to [Calendar Versioning](https://calver.org/)
 
 ### Added
 
+* Unsupported QoS in publish will result in PUBACK with return code NOT_SUPPORTED.
+
 ### Changed
 
 * Made client and topic store Protocols use async methods.
+* Using the QoS of MQTT-SN message when publishing to MQTT.
 
 ### Deprecated
 

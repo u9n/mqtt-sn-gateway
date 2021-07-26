@@ -216,11 +216,11 @@ class Register:
 
         message_type = MessageType(data.pop(0))
 
-        topic_id = bytes(data[:2])
-        if topic_id == b"\x00\x00":
+        topic_id_data = bytes(data[:2])
+        if topic_id_data == b"\x00\x00":
             topic_id = None
         else:
-            topic_id = int.from_bytes(topic_id, "big")
+            topic_id = int.from_bytes(topic_id_data, "big")
         data = data[2:]
 
         msg_id = bytes(data[:2])
@@ -351,12 +351,37 @@ class Puback:
 @attr.s(auto_attribs=True)
 class Disconnect:
     msg_type: ClassVar[MessageType] = MessageType.DISCONNECT
-    length: int
-    duration: int
+    duration: Optional[int] = attr.ib(default=None)
+
+    @property
+    def length(self):
+        if self.duration:
+            return 4
+        else:
+            return 2
+
+    def to_bytes(self) -> bytes:
+        out = bytearray()
+        out.append(self.length)
+        out.append(self.msg_type)
+        if self.duration:
+            out.extend(self.duration.to_bytes(2, 'big'))
+        return bytes(out)
 
     @classmethod
     def from_bytes(cls, source_bytes):
-        return cls
+        data = bytearray(source_bytes)
+        length = data.pop(0)
+        msg_type = data.pop(0)
+        if msg_type != cls.msg_type:
+            raise ValueError("Not a DISCONNECT message")
+        if length == 2:
+            return cls(duration=None)
+        else:
+            duration = int.from_bytes(data, 'big')
+            return cls(duration=duration)
+
+
 
 
 @attr.s(auto_attribs=True)

@@ -18,7 +18,7 @@ REQUIRED = [
     "click==8.0.1",
     "asyncio-mqtt==0.9.1",
     "asyncio-dgram==2.0.0",
-    "uvloop==0.15.2",
+    #"uvloop==0.15.2",
     "structlog==21.1.0",
 ]
 

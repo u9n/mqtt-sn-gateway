@@ -1,6 +1,6 @@
-asyncio-dgram==2.0.0
-asyncio-mqtt==0.9.1
-attrs==21.2.0
+attrs==25.1.0
 click==8.0.1
 django-environ==0.4.5
-uvloop==0.15.2
+structlog==21.1.0
+valkey==6.1.0
+rich==13.9.4

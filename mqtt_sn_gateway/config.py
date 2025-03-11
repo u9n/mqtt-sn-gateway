@@ -14,15 +14,12 @@ def format_env_path(env_file_path: str):
 class Config:
     HOST: str
     PORT: int
-    BROKER_HOST: str
-    BROKER_PORT: int
-    BROKER_CONNECTIONS: int
-    BACK_PRESSURE_LIMIT: int
-
-
+    AMQP_CONNECTION_STRING: str
+    AMQP_PUBLISH_EXCHANGE: str
+    VALKEY_CONNECTION_STRING: str
 
     def __init__(
-        self, env_file_path: Optional[str] = None, no_env_files: Optional[bool] = False
+            self, env_file_path: Optional[str] = None, no_env_files: Optional[bool] = False
     ):
         root_dir = Path(__file__).parents[1]
         env = environ.Env()
@@ -31,14 +28,10 @@ class Config:
             file_path = env_file_path or Path.joinpath(root_dir, ".env")
             env.read_env(env_file=str(file_path))
 
-        self.HOST = env.str("HOST")
-        self.PORT = env.int("PORT")
-        self.BROKER_HOST = env.str("BROKER_HOST")
-        self.BROKER_PORT = env.int("BROKER_PORT", default=1883)
-        self.BROKER_CONNECTIONS = env.int("BROKER_CONNECTIONS", default=10)
-        self.BACK_PRESSURE_LIMIT = env.int("BACK_PRESSURE_LIMIT", default=1000)
-
-
-
+        self.HOST = env.str("MQTTSN_HOST")
+        self.PORT = env.int("MQTTSN_PORT")
+        self.AMQP_CONNECTION_STRING = env.str("MQTTSN_AMQP_CONNECTION_STRING", default='amqp://guest:guest@localhost:5672//')
+        self.AMQP_PUBLISH_EXCHANGE = env.str("MQTTSN_AMQP_PUBLISH_EXCHANGE", default='mqtt-sn')
+        self.VALKEY_CONNECTION_STRING = env.str("MQTTSN_VALKEY_CONNECTION_STRING", default='valkey://localhost:6379/0')
 
 

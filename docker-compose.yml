@@ -12,11 +12,11 @@ services:
     #build: .
     image: quay.io/u9n/mqtt-sn-gateway:latest
     ports:
-    - 2883:2883/udp
+    - 1883:1883/udp
 
     environment:
       - HOST=0.0.0.0
-      - PORT=2883
+      - PORT=1883
       - BROKER_HOST=rabbit-mqtt
       - BROKER_PORT=1883
       - BROKER_CONNECTIONS=20
@@ -24,3 +24,8 @@ services:
 
     depends_on:
       - rabbit-mqtt
+
+  valkey:
+    image: valkey/valkey
+    ports:
+      - 6379:6379

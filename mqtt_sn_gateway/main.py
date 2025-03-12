@@ -5,15 +5,16 @@ import click
 from mqtt_sn_gateway.config import Config
 from mqtt_sn_gateway.server import ThreadingUdpServer, MqttSnRequestHandler
 import sentry_sdk
+from structlog_sentry import SentryProcessor
 
 LOG = structlog.get_logger()
 
 
 @click.command()
-@click.option("--debug", is_flag=True, help="Enable debug logging")
-@click.option("--env-file", default=None, help="Path to .env file")
-@click.option("--no-env-files", is_flag=True, help="Discard all use of .env files.")
-@click.option("--json-logs", is_flag=True, help="Outputs logs in JSON-format")
+@click.option("--debug", is_flag=True, help="Enable debug logging", envvar="MQTTSN_DEBUG")
+@click.option("--env-file", default=None, help="Path to .env file", envvar="MQTTSN_ENV_FILE")
+@click.option("--no-env-files", is_flag=True, help="Discard all use of .env files.", envvar="MQTTSN_NO_ENV_FILES")
+@click.option("--json-logs", is_flag=True, help="Outputs logs in JSON-format", envvar="MQTTSN_JSON_LOGS")
 def main(debug, env_file, no_env_files: bool, json_logs: bool):
     """
     Will assume there is a .env file in the root of the package. This is for simple development.
@@ -26,7 +27,6 @@ def main(debug, env_file, no_env_files: bool, json_logs: bool):
     if config.SENTRY_DSN:
         sentry_sdk.init(
             dsn=config.SENTRY_DSN,
-            debug=True,
             # Add request headers and IP for users,
             # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
             send_default_pii=True,
@@ -34,6 +34,7 @@ def main(debug, env_file, no_env_files: bool, json_logs: bool):
         LOG.info("Initiated Sentry SDK for error tracking")
 
     if debug:
+        LOG.info("Debug is enabled")
         log_level = logging.DEBUG
     else:
         log_level = logging.INFO
@@ -41,12 +42,14 @@ def main(debug, env_file, no_env_files: bool, json_logs: bool):
     structlog_processors = [
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,
+        SentryProcessor(event_level=logging.CRITICAL),
         structlog.processors.StackInfoRenderer(),
         structlog.dev.set_exc_info,
         structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S", utc=False),
 
     ]
     if json_logs:
+        # Have to disable the
         structlog_processors.append(structlog.processors.JSONRenderer())
     else:
         structlog_processors.append(structlog.dev.ConsoleRenderer())
@@ -68,5 +71,6 @@ def main(debug, env_file, no_env_files: bool, json_logs: bool):
         LOG.info("Stopping MQTT-SN server")
 
 
+
 if __name__ == "__main__":
-    main(auto_envvar_prefix="MQTTSN")
+    main()

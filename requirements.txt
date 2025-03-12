@@ -5,3 +5,4 @@ structlog==21.1.0
 valkey==6.1.0
 rich==13.9.4
 sentry_sdk==2.22.0
+structlog-sentry==2.2.1

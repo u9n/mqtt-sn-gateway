@@ -31,9 +31,8 @@ class Config:
 
         self.HOST = env.str("MQTTSN_HOST")
         self.PORT = env.int("MQTTSN_PORT")
-        self.AMQP_CONNECTION_STRING = env.str("MQTTSN_AMQP_CONNECTION_STRING", default='amqp://guest:guest@localhost:5672//')
+        self.AMQP_CONNECTION_STRING = env.str("MQTTSN_AMQP_CONNECTION_STRING",
+                                              default='amqp://guest:guest@localhost:5672//')
         self.AMQP_PUBLISH_EXCHANGE = env.str("MQTTSN_AMQP_PUBLISH_EXCHANGE", default='mqtt-sn')
         self.VALKEY_CONNECTION_STRING = env.str("MQTTSN_VALKEY_CONNECTION_STRING", default='valkey://localhost:6379/0')
         self.SENTRY_DSN = env.str("MQTTSN_SENTRY_DSN", default=None)
-
-

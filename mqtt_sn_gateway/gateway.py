@@ -74,6 +74,9 @@ class MqttSnGateway:
             self.client_store.add_client(client_id, remote_addr=self.remote_address)
             LOG.info(f"Client stored",
                      client_store=self.client_store)
+        except client_store.ConnectionError:
+            LOG.error(f"Unable to connect to client store. Returning CONGESTION", client_store=self.client_store)
+            return messages.Connack(return_code=messages.ReturnCode.CONGESTION)
         except Exception:
             LOG.exception("Unable to add client to client store",
                           client_store=self.client_store)
@@ -92,6 +95,9 @@ class MqttSnGateway:
         except client_store.ClientDoesNotExist:
             LOG.info(f"Received a REGISTER message from an unknown client, sending DISCONNECT")
             return messages.Disconnect()
+        except client_store.ConnectionError:
+            LOG.error(f"Unable to connect to client store. Returning CONGESTION", client_store=self.client_store)
+            return messages.Regack(topic_id=None, msg_id=message.msg_id, return_code=messages.ReturnCode.CONGESTION)
         except Exception:
             LOG.exception("Unable to retrieve client_id from client store")
             return messages.Regack(topic_id=None, msg_id=message.msg_id, return_code=messages.ReturnCode.CONGESTION)
@@ -100,6 +106,9 @@ class MqttSnGateway:
             topic_id = self.topic_store.add_topic_for_client(
                 topic_name=message.topic_name, client_id=client_id
             )
+        except topic_store.ConnectionError:
+            LOG.error(f"Unable to connect to topic store. Returning CONGESTION", topic_store=self.topic_store)
+            return messages.Regack(topic_id=None, msg_id=message.msg_id, return_code=messages.ReturnCode.CONGESTION)
         except Exception:
             LOG.exception("Unable to retrieve topic_id from topic store")
             return messages.Regack(topic_id=None, msg_id=message.msg_id, return_code=messages.ReturnCode.CONGESTION)
@@ -123,6 +132,10 @@ class MqttSnGateway:
         except client_store.ClientDoesNotExist:
             LOG.error(f"Received a PUBLISH from an unknown client, sending DISCONNECT")
             return messages.Disconnect()
+        except client_store.ConnectionError:
+            LOG.error(f"Unable to connect to client store. Returning CONGESTION", client_store=self.client_store)
+            return messages.Puback(topic_id=message.topic_id, msg_id=message.msg_id,
+                                   return_code=messages.ReturnCode.CONGESTION)
         except Exception:
             LOG.exception("Unable to retrieve client_id from client store")
             return messages.Puback(topic_id=message.topic_id, msg_id=message.msg_id,
@@ -146,6 +159,10 @@ class MqttSnGateway:
                 msg_id=message.msg_id,
                 return_code=messages.ReturnCode.INVALID_TOPIC,
             )
+        except topic_store.ConnectionError:
+            LOG.error(f"Unable to connect to topic store. Returning CONGESTION", topic_store=self.topic_store)
+            return messages.Puback(topic_id=message.topic_id, msg_id=message.msg_id,
+                                   return_code=messages.ReturnCode.CONGESTION)
         except Exception:
             LOG.exception(f"Unable to retrieve topic", topic_id=message.topic_id)
             return messages.Puback(topic_id=message.topic_id, msg_id=message.msg_id,

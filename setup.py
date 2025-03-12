@@ -5,7 +5,7 @@ from shutil import rmtree
 
 # Package meta-data.
 NAME = "mqtt-sn-gateway"
-DESCRIPTION = "An async Python MQTT-SN Gayeway"
+DESCRIPTION = "A Python MQTT-SN Gayeway"
 URL = "https://github.com/u9n/mqtt-sn-gateway"
 EMAIL = "henrik@pwit.se"
 AUTHOR = "Henrik Palmlund Wahlgren @ Palmlund Wahlgren Innovative Technology AB"
@@ -94,7 +94,6 @@ setup(
     keywords=[],
     classifiers=[
         "Development Status :: 5 - Production/Stable",
-        "License :: OSI Approved :: MIT License",
         "Natural Language :: English",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",

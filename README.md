@@ -1,43 +1,42 @@
 # mqtt-sn-gateway
-An asyncio Python implementation of a MQTT-SN Gateway
+An opinionated Python implementation of a MQTT-SN Gateway
 
 ## About
+This MQTT-SN Gateway was created to collect meter data from Elvaco CMi6110 communication modules, and other Elvaco
+metering products that support sending meter data via MQTT-SN.
 
-We built this since we needed a nice way to interface MQTT-SN devices into our data 
-stream. It is not feature complete as we wrote it quite quick but we hope to add onto 
-it as our need grows. We used a transparent gateway before we built this and once we 
-got over 1000 devices we got problems with the underlying I/O implementation.
-So this gateway is built as an aggregating gateway with multiple connections to the 
-MQTT broker.
+This is not a full MQTT-SN implementation and does not aim to be. In previous iterations we used RabbitMQ with the 
+mqtt plugin as the MQTT broker. But in later releases we removed the need to run an MQTT Broker at all and there is 
+only need for an AMQP Broker like RabbitMQ. We where using the MQTT/AMQP translation feature in RabbitMQ but realied 
+that we might as well not use the MQTT part at all and send everything directly on AMQP.
+
+The server uses Valkey as Client Store and Topic Store. This means each instance is not depending on any internal state
+and can be put behind a load balancer.
 
 ### Supported features
 
-* CONNECT - In-memory store of clients
-* REGISTER - In-memory store of registered topics in clients
-* PUBLISH - Receive a PUBLISH and forward it to MQTT broker
+* CONNECT 
+* REGISTER 
+* PUBLISH 
+* PINGREQ
 
-### Not supported - yet!
-* Gateway ADVERTISE
-* LAST WILL and TESTAMENT
-* QoS 2 and QoS-1
-* SUBSCRIBE
-* PINGREG/PINGRESP
-* Encapsulated messages
-* DTLS encryption
-  
+### Not supported.
+* DTLS encryption - This should be done in some form of reverse proxy setup and not in this application.
 
-### Future work
+## Run the server
 
-We would like a Redis-backed client and topic store. This would make it possible to 
-run several instances of the gateway with shared and persistent state for handling 
-higher loads and services outages.
+The server can be run like:
+
+```
+python mqtt_sn_gateway/main.py
+```
 
 ## Install
 
-Requires Python 3.7 and higher (since we use asyncio and it is much nicer in 3.7+)
+Clone the repo and install locally using `-e`
 
 ```
-pip install mqtt-sn-gateway
+pip install -e .
 ```
 
 ## Run via CLI
@@ -59,7 +58,9 @@ Options:
   --debug          Enable debug logging
   --env-file TEXT  Path to .env file
   --no-env-files   Discard all use of .env files.
+  --json-logs      Outputs logs in JSON-format
   --help           Show this message and exit.
+
 
 ```
 
@@ -75,47 +76,26 @@ docker pull quay.io/u9n/mqtt-sn-gateway
 
 You can use either an .env file or environment variables to set up the gateway.
 
-* HOST: str, Example 0.0.0.0 
-* PORT: int, Port so serve the gateway. Ex 2883
-* BROKER_HOST: str, Broker host, Ex: test.mosquitto.com
-* BROKER_PORT: int, Borker port, Default=1883
-* BROKER_CONNECTIONS: int: How many connections the gatewat should have to the broker, default=10
-* BACK_PRESSURE_LIMIT: int: How many unhandled UDP-packets should be queued up before not receiving more traffic, Default=1000
+* MQTTSN_HOST: str, Example 0.0.0.0 
+* MQTTSN_PORT: int, Port so serve the gateway. Ex 2883
+* MQTTSN_AMQP_CONNECTION_STRING: str, default: amqp://guest:guest@localhost:5672//
+* MQTTSN_AMQP_PUBLISH_EXCHANGE: str, default: mqtt-sn
+* MQTTSN_VALKEY_CONNECTION_STRING: str: default: valkey://localhost:6379/0
+* MQTTSN_SENTRY_DSN: str: default=None
 
+The following is not supported in .env file:
 
-## Extend
-
-It is possible to implement your own client and topic stores. Just supply the 
-gateway an object the follows the correct Protocol.
-
-```python
-
-class ClientStore(Protocol):
-    def add_client(self, client: MqttSnClient) -> None:
-        ...
-
-    def get_client(self, remote_addr: Tuple[str, int]) -> Optional[MqttSnClient]:
-        ...
-
-    def delete_client(self, remote_addr: Tuple[str, int]) -> None:
-        ...
-    
-    
-class TopicStore(Protocol):
-    def add_topic_for_client(self, client_id: bytes, topic_name: str) -> int:
-        ...
-
-    def get_topic_for_client(self, client_id: bytes, topic_id: int) -> Optional[str]:
-        ...
-
-```
-
-## Contribute
-We appreciate all contributions.  File a bug report or fix the issue yourself 
-and submit a pull request.
+* MQTTSN_DEBUG: bool, enables debug logging
+* MQTTSN_ENV_FILE: str, path to env file
+* MQTTSN_NO_ENV_FILES: bool, discard all use of env files
+* MQTTSN_JSON_LOGS: bool, outputs structured logs in json format
 
 
 ## Commercial support or custom development
-We at [Utilitarian](https://www.utilitarian.io) can help your company with integrating
+This software is not fully open source. It uses a source available, non-compete license which allows you or your 
+company to use the program for your own use. Using it in a commercial offering to others is not allowed and you will 
+need another license granted to you.
+
+We at [Utilitarian](https://www.utilitarian.io) offer support contracts and can help your company with integrating
 the gateway to your systems. Contact us if you wish to speed up development or make 
 sure your solution has long-term support.

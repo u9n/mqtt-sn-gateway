@@ -17,4 +17,4 @@ while True:
     duation_time = current_time - start_time
     if duation_time > 5:
         break
-    time.sleep(0.001)
+    time.sleep(0.0001)

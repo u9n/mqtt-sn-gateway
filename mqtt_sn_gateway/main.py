@@ -4,6 +4,7 @@ import structlog
 import click
 from mqtt_sn_gateway.config import Config
 from mqtt_sn_gateway.server import ThreadingUdpServer, MqttSnRequestHandler
+import sentry_sdk
 
 LOG = structlog.get_logger()
 
@@ -20,6 +21,17 @@ def main(debug, env_file, no_env_files: bool, json_logs: bool):
     To make force the application to discard all .env files use the --no-env-files flag.
 
     """
+    config = Config(env_file, no_env_files=no_env_files)
+
+    if config.SENTRY_DSN:
+        sentry_sdk.init(
+            dsn=config.SENTRY_DSN,
+            debug=True,
+            # Add request headers and IP for users,
+            # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+            send_default_pii=True,
+        )
+        LOG.info("Initiated Sentry SDK for error tracking")
 
     if debug:
         log_level = logging.DEBUG
@@ -48,7 +60,6 @@ def main(debug, env_file, no_env_files: bool, json_logs: bool):
     )
 
     try:
-        config = Config(env_file, no_env_files=no_env_files)
         mqtt_sn_server = ThreadingUdpServer((config.HOST, config.PORT), MqttSnRequestHandler, config=config)
         with mqtt_sn_server as server:
             LOG.info("Starting MQTT-SN server", host=config.HOST, port=config.PORT)

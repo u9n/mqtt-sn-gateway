@@ -1,5 +1,6 @@
 import socketserver
 
+import sentry_sdk
 import valkey
 
 from mqtt_sn_gateway.config import Config
@@ -26,24 +27,28 @@ class MqttSnRequestHandler(socketserver.DatagramRequestHandler):
         super().__init__(request, client_address, server)
 
     def handle(self):
-        data = self.request[0].strip()
-        socket = self.request[1]
-        structlog.contextvars.bind_contextvars(remote_ip=self.client_address[0], remote_port=self.client_address[1])
-        LOG.debug("Received UDP data", data=data)
-        vk = valkey.Valkey.from_url(self.config.VALKEY_CONNECTION_STRING)
-        clients = client_store.ValKeyClientStore(valkey=vk)
-        topics = topic_store.ValKeyTopicStore(valkey=vk)
-        amqp_connection = Connection(self.config.AMQP_CONNECTION_STRING)
-        amqp_exchange = Exchange(self.config.AMQP_PUBLISH_EXCHANGE, type='topic')
-        forwarder = AmqpForwarder(exchange=amqp_exchange, connection=amqp_connection)
-        gw = gateway.MqttSnGateway(remote_address=self.client_address, client_store=clients,
-                                   topic_store=topics, forwarder=forwarder)
+        try:
+            data = self.request[0].strip()
+            socket = self.request[1]
+            structlog.contextvars.bind_contextvars(remote_ip=self.client_address[0], remote_port=self.client_address[1])
+            LOG.debug("Received UDP data", data=data)
+            vk = valkey.Valkey.from_url(self.config.VALKEY_CONNECTION_STRING)
+            clients = client_store.ValKeyClientStore(valkey=vk)
+            topics = topic_store.ValKeyTopicStore(valkey=vk)
+            amqp_connection = Connection(self.config.AMQP_CONNECTION_STRING)
+            amqp_exchange = Exchange(self.config.AMQP_PUBLISH_EXCHANGE, type='topic')
+            forwarder = AmqpForwarder(exchange=amqp_exchange, connection=amqp_connection)
+            gw = gateway.MqttSnGateway(remote_address=self.client_address, client_store=clients,
+                                       topic_store=topics, forwarder=forwarder)
 
-        response = gw.dispatch(data)
-        out_data = response.to_bytes()
-        LOG.debug("Sending UDP data", data=out_data)
+            response = gw.dispatch(data)
+            out_data = response.to_bytes()
+            LOG.debug("Sending UDP data", data=out_data)
 
-        socket.sendto(out_data, self.client_address)
+            socket.sendto(out_data, self.client_address)
+        except Exception as e:
+            sentry_sdk.capture_exception(e)
+            raise
 
 
 class ThreadingUdpServer(socketserver.ThreadingMixIn, socketserver.UDPServer):

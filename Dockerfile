@@ -25,6 +25,7 @@ USER appuser
 WORKDIR /home/appuser/app/
 COPY . .
 
+
 USER root
 RUN pip3 install -e .
 USER appuser

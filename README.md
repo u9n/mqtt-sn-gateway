@@ -78,6 +78,7 @@ You can use either an .env file or environment variables to set up the gateway.
 
 * MQTTSN_HOST: str, Example 0.0.0.0 
 * MQTTSN_PORT: int, Port so serve the gateway. Ex 2883
+* MQTTSN_USE_PORT_NUMBER_IN_CLIENT_STORE: bool. use port number in client store key
 * MQTTSN_AMQP_CONNECTION_STRING: str, default: amqp://guest:guest@localhost:5672//
 * MQTTSN_AMQP_PUBLISH_EXCHANGE: str, default: mqtt-sn
 * MQTTSN_VALKEY_CONNECTION_STRING: str: default: valkey://localhost:6379/0
@@ -90,6 +91,16 @@ The following is not supported in .env file:
 * MQTTSN_NO_ENV_FILES: bool, discard all use of env files
 * MQTTSN_JSON_LOGS: bool, outputs structured logs in json format
 
+## Running behind a NAT
+
+If you have a NAT between the devices and the MQTT-SN Gateway it might be that incoming UDP-messages have the same IP.
+The NAT will use a certain port number to be able to map responses back to the device. We need to activate the setting 
+`MQTTSN_USE_PORT_NUMBER_IN_CLIENT_STORE` so that the key in the client store looks like `client:{ip}:{port}`.
+It is also important that the timeout for port assignment is high enough for your use case so that the NAT does not 
+remove the mapping when there is no messages being sent. If the mapping is removed the next message will get a new port 
+and the client will not be found in the client store. Which will result in a DISCONNECT and the device have to reconnect 
+and register again in the gateway. This causes more traffic and will also drain the battery of the device more than 
+necessary if battery operated.
 
 ## Commercial support or custom development
 This software is not fully open source. It uses a source available, non-compete license which allows you or your 

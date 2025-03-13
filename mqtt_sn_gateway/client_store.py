@@ -17,6 +17,8 @@ class ConnectionError(Exception):
     """Unable to connect to client store"""
 
 class ClientStore(Protocol):
+
+    use_port_number: bool
     def add_client(self, client_id: bytes, remote_addr: Tuple[str, int]) -> None:
         """
         :raises ClientStoreConnectionError: Unable to connect to client store.
@@ -47,10 +49,13 @@ class ValKeyClientStore:
 
     """
     valkey: valkey.Valkey
+    use_port_number: bool
 
-    @staticmethod
-    def key_from_remote_addr(remote_addr: Tuple[str, int]) -> str:
-        return f"client:{remote_addr[0]}:{remote_addr[1]}"
+    def key_from_remote_addr(self, remote_addr: Tuple[str, int]) -> str:
+        if self.use_port_number:
+            return f"client:{remote_addr[0]}:{remote_addr[1]}"
+        else:
+            return f"client:{remote_addr[0]}"
 
     def add_client(self, client_id: bytes, remote_addr: Tuple[str, int]) -> None:
         try:

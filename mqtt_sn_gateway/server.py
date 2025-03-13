@@ -33,7 +33,8 @@ class MqttSnRequestHandler(socketserver.DatagramRequestHandler):
             structlog.contextvars.bind_contextvars(remote_ip=self.client_address[0], remote_port=self.client_address[1])
             LOG.debug("Received UDP data", data=data)
             vk = valkey.Valkey.from_url(self.config.VALKEY_CONNECTION_STRING)
-            clients = client_store.ValKeyClientStore(valkey=vk)
+            clients = client_store.ValKeyClientStore(valkey=vk,
+                                                     use_port_number=self.config.USE_PORT_NUMBER_IN_CLIENT_STORE)
             topics = topic_store.ValKeyTopicStore(valkey=vk)
             amqp_connection = Connection(self.config.AMQP_CONNECTION_STRING)
             amqp_exchange = Exchange(self.config.AMQP_PUBLISH_EXCHANGE, type='topic')

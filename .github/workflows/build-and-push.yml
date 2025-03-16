@@ -24,13 +24,13 @@ jobs:
             registry.u9n.dev/u9n/mqtt-sn-gateway
           # generate Docker tags based on the following events/attributes
           tags: |
-            type=schedule
             type=ref,event=branch
             type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
             type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Login to Utilitarian Registry
         uses: docker/login-action@v3
@@ -38,6 +38,7 @@ jobs:
           registry: registry.u9n.dev
           username: ${{ vars.HARBOR_ROBOT_ACCOUNT }}
           password: ${{ secrets.HARBOR_ROBOT_SECRET }}
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 

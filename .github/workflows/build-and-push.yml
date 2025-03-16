@@ -21,7 +21,7 @@ jobs:
         with:
           # list of Docker images to use as base name for tags
           images: |
-            registry.u9n.dev/u9n
+            registry.u9n.dev/u9n/mqtt-sn-gateway
           # generate Docker tags based on the following events/attributes
           tags: |
             type=schedule
@@ -49,5 +49,6 @@ jobs:
         with:
           platforms: linux/amd64
           push: true
+          sbom: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

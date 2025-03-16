@@ -13,14 +13,7 @@ REQUIRES_PYTHON = ">=3.7"
 VERSION = "21.0.0"
 
 # What packages are required for this module to be executed?
-REQUIRED = [
-    "attrs==21.2.0",
-    "click==8.0.1",
-    "asyncio-mqtt==0.9.1",
-    "asyncio-dgram==2.0.0",
-    #"uvloop==0.15.2",
-    "structlog==21.1.0",
-]
+REQUIRED = []
 
 # What packages are optional?
 EXTRAS = {

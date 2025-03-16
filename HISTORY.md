@@ -11,12 +11,7 @@ and this project adheres to [Calendar Versioning](https://calver.org/)
 
 ### Added
 
-* Unsupported QoS in publish will result in PUBACK with return code NOT_SUPPORTED.
-
 ### Changed
-
-* Made client and topic store Protocols use async methods.
-* Using the QoS of MQTT-SN message when publishing to MQTT.
 
 ### Deprecated
 
@@ -24,10 +19,13 @@ and this project adheres to [Calendar Versioning](https://calver.org/)
 
 ### Fixed
 
-* If a client is not found in the client store the gateway responds with a DISCONNECT.
-
 ### Security
 
+## 25.1.0
+
+* Reimplemention on sync-IO. 
+* Removed the need to MQTT Broker and just runs on AMQP for data forwarding
+* Valkey based client and topic store
 
 ## 21.0.0 [2021-07-07]
 

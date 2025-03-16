@@ -10,7 +10,7 @@ services:
 
   mqttsngateway:
     #build: .
-    image: quay.io/u9n/mqtt-sn-gateway:sync-server
+    image: registry.u9n.dev/u9n/mqtt-sn-gateway:sync-server
     ports:
     - 1883:1883/udp
 

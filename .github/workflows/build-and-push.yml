@@ -1,0 +1,55 @@
+name: build-and-push
+on:
+  schedule:
+    - cron: "0 03 * * SUN"
+  push:
+    branches:
+      - "**"
+    tags:
+      - "*.*.*"
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          # list of Docker images to use as base name for tags
+          images: |
+            registry.u9n.dev/u9n/mqtt-sn-gateway
+          # generate Docker tags based on the following events/attributes
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Login to Utilitarian Registry
+        uses: docker/login-action@v3
+        with:
+          registry: registry.u9n.dev
+          username: ${{ vars.HARBOR_ROBOT_ACCOUNT }}
+          password: ${{ secrets.HARBOR_ROBOT_SECRET }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          platforms: linux/amd64
+          push: true
+          sbom: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

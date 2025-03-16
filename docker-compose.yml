@@ -1,8 +1,8 @@
 version: "2"
 
 services:
-  rabbit-mqtt:
-    build: ./mqtt_docker
+  rabbit:
+    image: rabbitmq:4-management
     ports:
       - 1883:1883
       - 15673:15672
@@ -10,17 +10,21 @@ services:
 
   mqttsngateway:
     #build: .
-    image: quay.io/u9n/mqtt-sn-gateway:latest
+    image: registry.u9n.dev/u9n/mqtt-sn-gateway:sync-server
     ports:
-    - 2883:2883/udp
+    - 1883:1883/udp
 
     environment:
-      - HOST=0.0.0.0
-      - PORT=2883
-      - BROKER_HOST=rabbit-mqtt
-      - BROKER_PORT=1883
-      - BROKER_CONNECTIONS=20
-      - BACK_PRESSURE_LIMIT=10000
+      - MQTTSN_HOST=0.0.0.0
+      - MQTTSN_PORT=1883
+      - MQTTSN_AMQP_CONNECTION_STRING="amqp://guest:guest@rabbit:5673//"
+      - MQTTSN_AMQP_PUBLISH_EXCHANGE=mqtt-sn
+      - MQTTSN_VALKEY_CONNECTION_STRING=valkey://valkey:6379/0
 
     depends_on:
-      - rabbit-mqtt
+      - rabbit
+
+  valkey:
+    image: valkey/valkey
+    ports:
+      - 6379:6379

@@ -1,4 +1,5 @@
-FROM python:3.13.2-slim-bookworm
+# Pin to python version to still recieve security updates
+FROM python:3.13-slim-bookworm
 
 ENV PYTHONUNBUFFERED 1
 

@@ -1,0 +1,57 @@
+name: rebuild-containers
+on:
+  schedule:
+    - cron: "0 3 * * SUN"  # Run weekly at sunday night ready for monday morning.
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  rebuild-containers:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        ref:
+          - main
+          - 25.1.0
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.ref }}
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            registry.u9n.dev/u9n/mqtt-sn-gateway
+          tags: |
+            type=raw,value=${{ matrix.ref }}
+            type=raw,value=latest,enable=${{ matrix.ref == 'main' }}
+
+      - name: Login to Utilitarian Registry
+        uses: docker/login-action@v3
+        with:
+          registry: registry.u9n.dev
+          username: ${{ vars.HARBOR_ROBOT_ACCOUNT }}
+          password: ${{ secrets.HARBOR_ROBOT_SECRET }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          platforms: linux/amd64
+          push: true
+          sbom: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          no-cache: true  # Force a clean build
+          build-args: |
+            BUILDKIT_INLINE_CACHE=0  # Disable inline caching
+          cache-from: type=gha  # Use GitHub Actions cache
+          cache-to: type=gha,mode=max  # Cache for future builds 

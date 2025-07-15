@@ -1,7 +1,5 @@
 name: build-and-push
 on:
-  schedule:
-    - cron: "0 03 * * SUN"
   push:
     branches:
       - "**"
@@ -47,6 +45,10 @@ jobs:
         with:
           platforms: linux/amd64
           push: true
-          sbom: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha  # Use GitHub Actions cache
+          cache-to: type=gha,mode=max  # Cache for future builds 
+          sbom: false
+          provenance: false
+          outputs: type=docker

@@ -47,7 +47,6 @@ jobs:
         with:
           platforms: linux/amd64
           push: true
-          sbom: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           no-cache: true  # Force a clean build
@@ -55,3 +54,6 @@ jobs:
             BUILDKIT_INLINE_CACHE=0  # Disable inline caching
           cache-from: type=gha  # Use GitHub Actions cache
           cache-to: type=gha,mode=max  # Cache for future builds 
+          sbom: false
+          provenance: false
+          outputs: type=docker

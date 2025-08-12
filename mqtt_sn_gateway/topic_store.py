@@ -5,6 +5,7 @@ import valkey
 
 LOG = structlog.get_logger(__name__)
 
+DEFAULT_TTL = 60 * 60 * 24 * 7 # 7 days
 
 class TopicDoesNotExist(Exception):
     """No such topic"""
@@ -32,6 +33,12 @@ class TopicStore(Protocol):
         """
         On clean session all topics should be erased.
         :raises TopicStoreConnectionError: Incase unable to connectto topic store
+        """
+
+    def extend_topic_ttl(self, client_id: bytes) -> None:
+        """
+        Sets or extends the ttl on a list item in the topic store.
+        :raises TopicStoreConnectionError: Incase unable to connect to topic store
         """
 
 
@@ -84,5 +91,13 @@ class ValKeyTopicStore:
             key = self.build_key(client_id)
             LOG.debug("Deleting all topics for client", key=key, client_id=client_id)
             self.valkey.delete(key)
+        except valkey.exceptions.ConnectionError:
+            raise ConnectionError("Unable to connect to topic store")
+
+    def extend_topic_ttl(self, client_id: bytes) -> None:
+        try:
+            key = self.build_key(client_id)
+            LOG.debug("Extending ttl for topic list", key=key, client_id=client_id)
+            self.valkey.expire(key, DEFAULT_TTL)
         except valkey.exceptions.ConnectionError:
             raise ConnectionError("Unable to connect to topic store")

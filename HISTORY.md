@@ -9,7 +9,6 @@ and this project adheres to [Calendar Versioning](https://calver.org/)
 ## Unreleased
 
 
-### Added
 
 ### Changed
 
@@ -20,6 +19,13 @@ and this project adheres to [Calendar Versioning](https://calver.org/)
 ### Fixed
 
 ### Security
+
+## 25.2.0 (2025-08-12)
+
+### Added
+
+* Extending store ttl by default on publish.
+* Added EXTEND_STORE_TTL_ON_PUBLISH setting with default `True`
 
 ## 25.1.0
 

@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import Optional
-
+from attrs import define
 import environ  # type: ignore
 
 
@@ -10,11 +10,12 @@ def format_env_path(env_file_path: str):
     else:
         return env_file_path + ".env"
 
-
+@define
 class Config:
     HOST: str
     PORT: int
     USE_PORT_NUMBER_IN_CLIENT_STORE: bool
+    EXTEND_STORE_TTL_ON_PUBLISH: bool
     AMQP_CONNECTION_STRING: str
     AMQP_PUBLISH_EXCHANGE: str
     VALKEY_CONNECTION_STRING: str
@@ -33,6 +34,7 @@ class Config:
         self.HOST = env.str("MQTTSN_HOST")
         self.PORT = env.int("MQTTSN_PORT")
         self.USE_PORT_NUMBER_IN_CLIENT_STORE = env.bool("MQTTSN_USE_PORT_NUMBER_IN_CLIENT_STORE")
+        self.EXTEND_STORE_TTL_ON_PUBLISH = env.bool("MQTTSN_EXTEND_STORE_TTL_ON_PUBLISH", default=True)
         self.AMQP_CONNECTION_STRING = env.str("MQTTSN_AMQP_CONNECTION_STRING",
                                               default='amqp://guest:guest@localhost:5672//')
         self.AMQP_PUBLISH_EXCHANGE = env.str("MQTTSN_AMQP_PUBLISH_EXCHANGE", default='mqtt-sn')

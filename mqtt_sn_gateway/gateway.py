@@ -1,6 +1,6 @@
 from typing import Tuple
 
-from attrs import define
+from attrs import define, field
 
 from mqtt_sn_gateway import messages, forward, client_store, topic_store
 import structlog
@@ -12,7 +12,7 @@ class MessageError(Exception):
     """"""
 
 
-class ForwarnigError(Exception):
+class ForwardingError(Exception):
     """Error when forwarding a message"""
 
 
@@ -22,13 +22,14 @@ class MqttSnGateway:
     topic_store: topic_store.TopicStore
     client_store: client_store.ClientStore
     forwarder: forward.MqttSnForwarder
+    extend_store_ttl_on_publish: bool = field(default=True)
 
     def forward(self, topic: str, payload: bytes, qos: int):
         try:
             self.forwarder.forward_publish(topic=topic, payload=payload, qos=qos)
         except Exception:
             LOG.exception("Error when forwarding message")
-            raise ForwarnigError
+            raise ForwardingError
 
     def dispatch(self, data: bytes):
         try:
@@ -170,22 +171,29 @@ class MqttSnGateway:
 
         try:
             self.forward(topic=topic, payload=message.data, qos=message.flags.qos)
-        except ForwarnigError:
+        except ForwardingError:
             LOG.error("Unable to forward message", forarder=self.forwarder, topic=topic,
                       payload=message.data)
             return messages.Puback(topic_id=message.topic_id, msg_id=message.msg_id,
                                    return_code=messages.ReturnCode.CONGESTION)
         except Exception:
-            # TODO: if we are not able to forward we should return a puback with consgestion status
-            # Ex:
-            # puback = messages.Puback(
-            #    topic_id=msg.topic_id,
-            #    msg_id=msg.msg_id,
-            #    return_code=messages.ReturnCode.CONGESTION,
-            # )
             LOG.exception("Unable to forward MQTT-SN message")
             return messages.Puback(topic_id=message.topic_id, msg_id=message.msg_id,
                                    return_code=messages.ReturnCode.CONGESTION)
+
+        if self.extend_store_ttl_on_publish:
+            try:
+                LOG.debug(f"Extending TTL of client store and topic store")
+                self.client_store.extend_client_ttl(remote_addr=self.remote_address)
+                self.topic_store.extend_topic_ttl(client_id=client_id)
+            except client_store.ConnectionError:
+                # We don't care that much that we could not set expire
+                LOG.error(f"Unable to connect to client store when extending client ttl")
+                pass
+            except topic_store.ConnectionError:
+                LOG.error(f"Unable to connect to topic store when extending topic ttl")
+                pass
+
 
         return messages.Puback(
             topic_id=message.topic_id,

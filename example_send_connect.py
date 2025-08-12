@@ -1,6 +1,6 @@
 import socket
 
-HOST, PORT = "10.25.0.218", 1884
+HOST, PORT = "localhost", 1883
 
 msg = b'\x16\x04\x04\x01\xfd 94193A04010020B8'
 

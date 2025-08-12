@@ -23,7 +23,7 @@ def main(debug, env_file, no_env_files: bool, json_logs: bool):
 
     """
     config = Config(env_file, no_env_files=no_env_files)
-
+    print(config)
     if config.SENTRY_DSN:
         sentry_sdk.init(
             dsn=config.SENTRY_DSN,

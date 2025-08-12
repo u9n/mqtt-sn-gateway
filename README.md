@@ -64,14 +64,6 @@ Options:
 
 ```
 
-## Run via Docker
-
-You can pull the latest docker-image and run via docker if needed.
-
-```shell
-docker pull quay.io/u9n/mqtt-sn-gateway
-```
-
 ## Settings
 
 You can use either an .env file or environment variables to set up the gateway.
@@ -79,6 +71,7 @@ You can use either an .env file or environment variables to set up the gateway.
 * MQTTSN_HOST: str, Example 0.0.0.0 
 * MQTTSN_PORT: int, Port so serve the gateway. Ex 2883
 * MQTTSN_USE_PORT_NUMBER_IN_CLIENT_STORE: bool. use port number in client store key
+* MQTTSN_EXTEND_STORE_TTL_ON_PUBLISH: bool, default: true. 
 * MQTTSN_AMQP_CONNECTION_STRING: str, default: amqp://guest:guest@localhost:5672//
 * MQTTSN_AMQP_PUBLISH_EXCHANGE: str, default: mqtt-sn
 * MQTTSN_VALKEY_CONNECTION_STRING: str: default: valkey://localhost:6379/0

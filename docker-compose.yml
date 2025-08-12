@@ -4,22 +4,23 @@ services:
   rabbit:
     image: rabbitmq:4-management
     ports:
-      - 1883:1883
       - 15673:15672
       - 5673:5672
 
   mqttsngateway:
-    #build: .
-    image: registry.u9n.dev/u9n/mqtt-sn-gateway:sync-server
+    build: .
+    #image: registry.u9n.dev/u9n/mqtt-sn-gateway:sync-server
     ports:
     - 1883:1883/udp
 
     environment:
       - MQTTSN_HOST=0.0.0.0
       - MQTTSN_PORT=1883
-      - MQTTSN_AMQP_CONNECTION_STRING="amqp://guest:guest@rabbit:5673//"
+      - MQTTSN_DEBUG=true
+      - MQTTSN_AMQP_CONNECTION_STRING=amqp://guest:guest@rabbit:5672//
       - MQTTSN_AMQP_PUBLISH_EXCHANGE=mqtt-sn
       - MQTTSN_VALKEY_CONNECTION_STRING=valkey://valkey:6379/0
+      - MQTTSN_USE_PORT_NUMBER_IN_CLIENT_STORE=false
 
     depends_on:
       - rabbit

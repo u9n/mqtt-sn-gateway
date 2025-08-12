@@ -1,7 +1,6 @@
-from typing import Dict, Tuple, Protocol
+from typing import Tuple, Protocol
 
-from mqtt_sn_gateway.common import MqttSnClient
-from attrs import define, field
+from attrs import define
 import valkey
 import structlog
 
@@ -39,6 +38,11 @@ class ClientStore(Protocol):
         """
         ...
 
+    def extend_client_ttl(self, remote_addr: Tuple[str, int]) -> None:
+        """
+        :raises ClientStoreConnectionError: Unable to connect to client store.
+        """
+
 
 @define
 class ValKeyClientStore:
@@ -63,6 +67,7 @@ class ValKeyClientStore:
             LOG.debug(f"Adding client", client_id=client_id, remote_addr=remote_addr, key=key, ttl=CLIENT_TTL)
             self.valkey.set(name=key, value=client_id, ex=CLIENT_TTL)
         except valkey.exceptions.ConnectionError as e:
+            LOG.error(f"Connection error when adding client", client_id=client_id, remote_addr=remote_addr)
             raise ConnectionError("Unable to connect to client store") from e
 
     def get_client(self, remote_addr: Tuple[str, int]) -> bytes:
@@ -73,16 +78,27 @@ class ValKeyClientStore:
 
             client_id = self.valkey.get(name=self.key_from_remote_addr(remote_addr))
             if client_id is None:
+                LOG.error(f"Client does not exist in store", remote_addr=remote_addr)
                 raise ClientDoesNotExist(f"No such client")
             return client_id
 
         except valkey.exceptions.ConnectionError as e:
+            LOG.error(f"Connection error to client store when getting client data", remote_addr=remote_addr, store=self)
             raise ConnectionError("Unable to connect to client store") from e
 
 
     def delete_client(self, remote_addr: Tuple[str, int]) -> None:
         try:
-
+            LOG.debug(f"Deleting client", remote_addr=remote_addr)
             self.valkey.delete(self.key_from_remote_addr(remote_addr))
         except valkey.exceptions.ConnectionError as e:
+            LOG.error(f"Connection error to client store when deleting client", remote_addr=remote_addr, store=self)
+            raise ConnectionError("Unable to connect to client store") from e
+
+    def extend_client_ttl(self, remote_addr: Tuple[str, int]) -> None:
+        try:
+            LOG.debug(f"Extending client TTL", remote_addr=remote_addr)
+            self.valkey.expire(name=self.key_from_remote_addr(remote_addr), time=CLIENT_TTL)
+        except valkey.exceptions.ConnectionError as e:
+            LOG.error(f"Connection error to client store when extending client", remote_addr=remote_addr, store=self)
             raise ConnectionError("Unable to connect to client store") from e

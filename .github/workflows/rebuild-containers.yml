@@ -11,7 +11,7 @@ jobs:
       matrix:
         ref:
           - main
-          - 25.1.0
+          - 25.3.0
 
     steps:
       - name: Checkout code

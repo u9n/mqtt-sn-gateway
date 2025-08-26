@@ -14,7 +14,7 @@ from functools import partial
 LOG = structlog.get_logger(__name__)
 
 
-class MqttSnRequestHandler(socketserver.DatagramRequestHandler):
+class MqttSnRequestHandler(socketserver.BaseRequestHandler):
     """
     This class works similar to the TCP handler class, except that
     self.request consists of a pair of data and client socket, and since
@@ -60,9 +60,10 @@ class MqttSnRequestHandler(socketserver.DatagramRequestHandler):
 
             response = gw.dispatch(data)
             out_data = response.to_bytes()
-            LOG.debug("Sending UDP data", data=out_data)
 
+            LOG.debug("Sending UDP data", data=out_data)
             socket.sendto(out_data, self.client_address)
+
         except Exception as e:
             sentry_sdk.capture_exception(e)
             raise

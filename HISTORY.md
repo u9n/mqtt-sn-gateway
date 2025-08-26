@@ -18,6 +18,10 @@ and this project adheres to [Calendar Versioning](https://calver.org/)
 
 ### Fixed
 
+* By inheriting from DatagramRequestHandler there was a hidden call to `socket.sendall()`
+  This resulted in an empty packet being sent and older devices could not handle this. 
+  By inheriting directly from BaseRequestHandler this was fixed.
+
 ### Security
 
 ## 25.2.0 (2025-08-12)

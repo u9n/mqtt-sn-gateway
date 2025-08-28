@@ -34,7 +34,7 @@ class MqttSnRequestHandler(socketserver.BaseRequestHandler):
 
     def handle(self):
         try:
-            data = self.request[0].strip()
+            data = self.request[0]
             socket = self.request[1]
             structlog.contextvars.bind_contextvars(
                 remote_ip=self.client_address[0], remote_port=self.client_address[1]

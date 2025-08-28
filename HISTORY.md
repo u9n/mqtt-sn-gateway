@@ -20,6 +20,13 @@ and this project adheres to [Calendar Versioning](https://calver.org/)
 
 ### Security
 
+## 25.3.1 (2025-08-28)
+
+### Fixed
+
+* A loose call to .strip() removed data when the initial byte was formated as asccii space. This made the data 
+  malformed when the data was of a certain length. Removed the .strip()-call and no issues anymore.
+
 ## 25.3.0 (2025-08-26)
 
 ### Fixed

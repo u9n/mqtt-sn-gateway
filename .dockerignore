@@ -1,0 +1,37 @@
+# Git and CI metadata
+.git
+.github
+.pi
+
+# Local Python environments and caches
+.venv
+venv
+env
+ENV
+__pycache__
+*.py[cod]
+*.pyo
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+
+# Local IDE/project files
+.idea
+.vscode
+
+# Local secrets/configuration
+.env
+*.env
+
+# Build artifacts
+build
+dist
+*.egg-info
+.eggs
+wheels
+
+# OS/editor noise
+.DS_Store
+*.swp

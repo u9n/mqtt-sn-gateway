@@ -1,23 +1,74 @@
 name: rebuild-containers
+
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - .github/workflows/rebuild-containers.yml
   schedule:
     - cron: "0 3 * * SUN"  # Run weekly at sunday night ready for monday morning.
   workflow_dispatch:  # Allow manual trigger
 
+env:
+  LATEST_RELEASES_TO_REBUILD: "2"
+
 jobs:
+  discover-refs:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.refs.outputs.matrix }}
+    steps:
+      - name: Checkout tags
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Select main and latest release tags
+        id: refs
+        shell: bash
+        run: |
+          mapfile -t release_refs < <(
+            git tag --list --sort=-version:refname |
+              grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' |
+              head -n "${LATEST_RELEASES_TO_REBUILD}" || true
+          )
+
+          refs=("main" "${release_refs[@]}")
+          matrix=$(printf '%s\n' "${refs[@]}" | jq -R . | jq -cs '{ref: .}')
+
+          printf 'Rebuilding refs:\n'
+          printf ' - %s\n' "${refs[@]}"
+          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
+
   rebuild-containers:
+    needs: discover-refs
     runs-on: ubuntu-latest
     strategy:
-      matrix:
-        ref:
-          - main
-          - 25.3.1
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.discover-refs.outputs.matrix) }}
 
     steps:
-      - name: Checkout code
+      - name: Checkout current Docker packaging
+        uses: actions/checkout@v4
+        with:
+          path: packaging
+
+      - name: Checkout source ref
         uses: actions/checkout@v4
         with:
           ref: ${{ matrix.ref }}
+          path: source
+
+      - name: Prepare build context
+        id: build-context
+        shell: bash
+        run: |
+          cp packaging/.dockerignore source/.dockerignore
+          echo "revision=$(git -C source rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
 
       - name: Docker meta
         id: meta
@@ -28,6 +79,8 @@ jobs:
           tags: |
             type=raw,value=${{ matrix.ref }}
             type=raw,value=latest,enable=${{ matrix.ref == 'main' }}
+          labels: |
+            org.opencontainers.image.revision=${{ steps.build-context.outputs.revision }}
 
       - name: Login to Utilitarian Registry
         uses: docker/login-action@v3
@@ -47,13 +100,15 @@ jobs:
         with:
           platforms: linux/amd64
           push: true
+          pull: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          context: ./source
+          file: ./packaging/Dockerfile
           no-cache: true  # Force a clean build
           build-args: |
             BUILDKIT_INLINE_CACHE=0  # Disable inline caching
           cache-from: type=gha  # Use GitHub Actions cache
-          cache-to: type=gha,mode=max  # Cache for future builds 
+          cache-to: type=gha,mode=max  # Cache for future builds
           sbom: false
           provenance: false
-          outputs: type=docker

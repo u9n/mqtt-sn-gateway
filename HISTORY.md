@@ -20,6 +20,11 @@ and this project adheres to [Calendar Versioning](https://calver.org/)
 
 ### Security
 
+## 26.1.0 (2026-10-22)
+
+### Security
+* Docker builds now bootstrap pip from the SHA-256-verified 26.2.2 wheel before upgrading to the latest release and creating a virtualenv without ensurepip. Runtime images remove the unused global pip and ensurepip bundle to prevent seeding environments with an outdated installer.
+
 ## 25.3.1 (2025-08-28)
 
 ### Fixed

@@ -10,7 +10,7 @@ URL = "https://github.com/u9n/mqtt-sn-gateway"
 EMAIL = "henrik@pwit.se"
 AUTHOR = "Henrik Palmlund Wahlgren @ Palmlund Wahlgren Innovative Technology AB"
 REQUIRES_PYTHON = ">=3.7"
-VERSION = "21.0.0"
+VERSION = "26.1.0"
 
 # What packages are required for this module to be executed?
 REQUIRED = []
